@@ -31,9 +31,16 @@ int executaEntrada(char **entrada_parseada){
         printf("banana");
     }else{
         pid = fork();
-        if (pid == -1)
-        if (pid == 0){
-            execvp(entrada_parseada[0], entrada_parseada);
+        if (pid == -1){
+            printf("/nFalha ao fazer fork");
+            return;
+        } else if (pid == 0){
+            if (execvp(entrada_parseada[0], entrada_parseada) < 0)
+                printf("/nO programa não pode ser aberto");
+        } else {
+            // Espera o programa child terminar
+            wait(NULL);
+            return;
         }
         exit(0);
     }
