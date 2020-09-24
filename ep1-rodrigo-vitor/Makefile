@@ -1,2 +1,7 @@
+all: bccsh ep1
+
 bccsh: bccsh.c
-	gcc -o bccsh bccsh.c -lreadline
+	gcc -Wall -o bccsh bccsh.c -lreadline
+
+ep1: ep1.c
+	gcc -Wall -o ep1 ep1.c -pthread
