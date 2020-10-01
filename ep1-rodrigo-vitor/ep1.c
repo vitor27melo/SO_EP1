@@ -3,57 +3,102 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <math.h>
 #include <time.h>
 
 #define DEBUG 0
 
-int thread_state = 1;
+short int *commthread;
+// Vetor para comunicacao entre a main thread e as thread filhas;
+// apenas a main thread a modifica.
+// Funciona assim, para a branch numero n, o vetor commthread[n] tem os numero possiveis
+// 0 -> Branch deve pausar sua execucao
+// 1 -> Branch deve rodar
+// 2 -> Branch deve se finalizar
 
-void * ThreadAdd(void * a){
-    while(1){
-        switch (thread_state){
-            case 1:
-                printf("banana\n");
-                printf("maca\n");
-                break;
-            case 0:
-                pthread_exit(0);
-        }     
+void * ThreadAdd(void * m_args){
+    // thread_number *args = m_args;
+    int n = *((int *)m_args);
+    int count = -20000;
+    return 0;
+    switch (commthread[n]){
+    case 1:
+        if(count<20000)
+            count++;
+        else
+            count = -20000;
+        break;
+    case 2:
+        return 1;
+    default:
+        break;
     }
-    
-    // int i;
-    // for (i = -32767; 1>0; i++){
-    //     if(i == 32767)
-    //         i = -32767;
-    // }
 }
 
-void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count){
+void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE* saida_file){
     printf("-----------First-Come First-Served Scheduling-----------\n");
-    clock_t tempo_corrido[count];
+    commthread = malloc(count * sizeof(short int));
+    clock_t start;
     pthread_t tid[count];
+    start = clock();
+
+    double tempo_inicio, tempo_corrido, tempo_final, auxd;
+    int *arg, context_chg = 0;
+
+    char linha_saida_file[50] = {0};
+    
+    start = clock();
     for(int i = 0; i < count; i++){
-        if (pthread_create(&tid[0], NULL, ThreadAdd, NULL)) {
-            printf("\n ERROR creating thread 1");
+        context_chg++;
+        arg = malloc(sizeof(int));
+        arg = &i;
+
+        commthread[i] = 1;
+
+        tempo_inicio = (double)(clock() - start) / CLOCKS_PER_SEC;
+        while (tempo_inicio < t0_list[i])
+            tempo_inicio = (double)(clock() - start) / CLOCKS_PER_SEC;
+        
+        // printf("Chamou thread n:%d, no tempo: %f\n",i,tempo_corrido);
+        if (pthread_create(&tid[i], NULL, ThreadAdd, arg)) {
+            printf("\n ERROR creating thread");
             exit(1);
         }
-        tempo_corrido[i] = clock();
+        
+        auxd = (double)clock() / CLOCKS_PER_SEC;
+        tempo_corrido = auxd - tempo_inicio;
+        while (tempo_corrido < dt_list[i]){
+            auxd = (double)clock() / CLOCKS_PER_SEC;
+            tempo_corrido = auxd - tempo_inicio;
+        }
+        commthread[i] = 2;
+
+
         if (pthread_join(tid[i], NULL))  {
             printf("\n ERROR joining thread");
             exit(1);
         }
+
+        auxd = (double)clock() / CLOCKS_PER_SEC;
+        tempo_corrido = auxd - tempo_inicio;
+        tempo_final = ((double)(clock() - start)) / CLOCKS_PER_SEC;
+        sprintf(linha_saida_file, "%s %lf %lf\n", nome_list[i], tempo_final, tempo_corrido );
+        printf("%s",linha_saida_file);
+        fputs(linha_saida_file, saida_file);
+        // free(args);
     }
-    sleep(1);
-    thread_state = 0;
+    sprintf(linha_saida_file, "%d\0", context_chg);
+    fputs(linha_saida_file, saida_file);
+    // free(commthread);
     printf("Thread fechada");
 }
 
-void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count){
+void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file){
     clock_t start;
     printf("-----------Shortest Remaining Time Next Scheduling-----------\n");
 }
 
-void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count){
+void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file){
     clock_t start;
     printf("-----------Round Robin Scheduling-----------\n");
 }
@@ -118,8 +163,9 @@ int * parseInt(FILE *trace_file, int n_espacos, int count){
 
 
 int main(int argc, char *argv[]){
-    FILE *trace_file;
+    FILE *trace_file, *saida_file = 0;
     trace_file = fopen(argv[2],"rb");
+    saida_file = fopen(argv[3],"w");
     char c;
     int i = 0, count = 0;
     // Determina o número de linhas do arquivo
@@ -156,11 +202,11 @@ int main(int argc, char *argv[]){
         printf("----------------------------\n");
     }
     if(atoi(argv[1]) == 1)
-        FIFO(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count);
+        FIFO(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file);
     else if(atoi(argv[1]) == 2)
-        SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count);
+        SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file);
     else
-        RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count);
+        RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file);
     
 
     return 0;
