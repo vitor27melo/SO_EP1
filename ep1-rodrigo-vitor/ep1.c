@@ -8,6 +8,8 @@
 
 #define DEBUG 0
 
+pthread_mutex_t *mutex;
+
 short int *commthread;
 // Vetor para comunicacao entre a main thread e as thread filhas;
 // apenas a main thread a modifica.
@@ -17,6 +19,7 @@ short int *commthread;
 // 2 -> Branch deve se finalizar
 
 void * ThreadAdd(void * m_args){
+    void *ret;
     // thread_number *args = m_args;
     int n = *((int *)m_args);
     int count = -20000;
@@ -29,13 +32,13 @@ void * ThreadAdd(void * m_args){
             count = -20000;
         break;
     case 2:
-        return 1;
+        return ret;
     default:
         break;
     }
 }
 
-void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE* saida_file){
+void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE* saida_file, short int d){
     printf("-----------First-Come First-Served Scheduling-----------\n");
     commthread = malloc(count * sizeof(short int));
     clock_t start;
@@ -64,6 +67,8 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
             printf("\n ERROR creating thread");
             exit(1);
         }
+        if(d)
+            fprintf(stderr, "Chegou um processo no sistema: %s %d %d %d\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
         
         auxd = (double)clock() / CLOCKS_PER_SEC;
         tempo_corrido = auxd - tempo_inicio;
@@ -73,33 +78,29 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
         }
         commthread[i] = 2;
 
-
         if (pthread_join(tid[i], NULL))  {
             printf("\n ERROR joining thread");
             exit(1);
         }
-
-        auxd = (double)clock() / CLOCKS_PER_SEC;
-        tempo_corrido = auxd - tempo_inicio;
         tempo_final = ((double)(clock() - start)) / CLOCKS_PER_SEC;
         sprintf(linha_saida_file, "%s %lf %lf\n", nome_list[i], tempo_final, tempo_corrido );
-        printf("%s",linha_saida_file);
+        if(d)
+            fprintf(stderr, "Processo finalizado: %s\n", linha_saida_file);
         fputs(linha_saida_file, saida_file);
         // free(args);
     }
-    sprintf(linha_saida_file, "%d\0", context_chg);
+    if(d)
+        fprintf(stderr, "No total, aconteceram %d mudancas de contexto.\n", context_chg);
+    sprintf(linha_saida_file, "%d", context_chg);
     fputs(linha_saida_file, saida_file);
     // free(commthread);
-    printf("Thread fechada");
 }
 
-void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file){
-    clock_t start;
+void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file, short int d){
     printf("-----------Shortest Remaining Time Next Scheduling-----------\n");
 }
 
-void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file){
-    clock_t start;
+void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file, short int d){
     printf("-----------Round Robin Scheduling-----------\n");
 }
 
@@ -122,8 +123,7 @@ char ** parseNome(FILE *trace_file, int count){
             j++;
         }
         nome[i][j] = '\0';
-        while(fgetc(trace_file) != '\n');
-        i++;
+        while(fgount_mutex
     }
     return nome;
 
@@ -167,7 +167,9 @@ int main(int argc, char *argv[]){
     trace_file = fopen(argv[2],"rb");
     saida_file = fopen(argv[3],"w");
     char c;
-    int i = 0, count = 0;
+    short int d = 0;
+    int i, count = 0;
+    if(argc == 5) d = 1;
     // Determina o número de linhas do arquivo
     for (c = getc(trace_file); c != EOF; c = getc(trace_file))
         if (c == '\n')
@@ -201,12 +203,31 @@ int main(int argc, char *argv[]){
             printf("%s\n",nome_proc_list[i]);
         printf("----------------------------\n");
     }
-    if(atoi(argv[1]) == 1)
-        FIFO(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file);
-    else if(atoi(argv[1]) == 2)
-        SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file);
-    else
-        RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file);
+    // if(atoi(argv[1]) == 1)
+    //     FIFO(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
+    // else if(atoi(argv[1]) == 2)
+    //     SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
+    // else
+    //     RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
+
+    mutex = malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(&mutex[0], NULL);
+
+    int *arg;
+    commthread = malloc(2 * sizeof(short int));
+    pthread_t tid[2];
+    for(i=0;i<2;i++){
+        arg = malloc(sizeof(int));
+        arg = &i;
+        if (pthread_create(&tid[0], NULL, ThreadAdd, arg)) {
+            printf("\n ERROR creating thread");
+            exit(1);
+        }
+        if (pthread_create(&tid[1], NULL, ThreadAdd, arg)) {
+            printf("\n ERROR creating thread");
+            exit(1);
+        }
+    }   
     
 
     return 0;
