@@ -5,21 +5,47 @@
 #include <pthread.h>
 #include <time.h>
 
-
 #define DEBUG 0
 
-void * ThreadAdd(void * a){
-    int i;
-    for (i = -32767; 1>0; i++){
-        if(i == 32767)
-            i = -32767;
-    }
+int thread_state = 1;
 
+void * ThreadAdd(void * a){
+    while(1){
+        switch (thread_state){
+            case 1:
+                printf("banana\n");
+                printf("maca\n");
+                break;
+            case 0:
+                pthread_exit(0);
+        }     
+    }
+    
+    // int i;
+    // for (i = -32767; 1>0; i++){
+    //     if(i == 32767)
+    //         i = -32767;
+    // }
 }
 
 void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count){
-    clock_t start;
     printf("-----------First-Come First-Served Scheduling-----------\n");
+    clock_t tempo_corrido[count];
+    pthread_t tid[count];
+    for(int i = 0; i < count; i++){
+        if (pthread_create(&tid[0], NULL, ThreadAdd, NULL)) {
+            printf("\n ERROR creating thread 1");
+            exit(1);
+        }
+        tempo_corrido[i] = clock();
+        if (pthread_join(tid[i], NULL))  {
+            printf("\n ERROR joining thread");
+            exit(1);
+        }
+    }
+    sleep(1);
+    thread_state = 0;
+    printf("Thread fechada");
 }
 
 void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count){
