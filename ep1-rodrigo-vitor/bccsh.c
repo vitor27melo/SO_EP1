@@ -22,7 +22,7 @@ void _kill(char **entrada_parseada){
         printf("Falha em matar o processo: %s\n", strerror(errno));
 }
 
-int _ln(char **entrada_parseada){
+void _ln(char **entrada_parseada){
     // Código para criar pasta
     printf("%s%s%s%s",entrada_parseada[0],entrada_parseada[1], entrada_parseada[2],entrada_parseada[3]);
     if(symlink(entrada_parseada[2],entrada_parseada[3]) == -1)
