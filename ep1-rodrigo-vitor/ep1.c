@@ -175,14 +175,6 @@ void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int co
         processo_criado[i] = 0;
         pthread_mutex_lock(&mutex[i]);
         killthread[i] = 0;
-        arg2[i]=i;
-        arg[i] = &arg2[i];
-        if (pthread_create(&tid[i], NULL, ThreadAdd, arg[i])) {
-            printf("\n ERROR creating thread");
-            exit(1);
-        }
-        if (d) 
-            fprintf(stderr, "Chegou um processo no sistema: %s %d %d %d\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
     }
     int *finalizado = malloc(count * sizeof(int));
     for (i=0;i<count;i++) finalizado[i]=0;
@@ -200,14 +192,38 @@ void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int co
             i++;
             continue;
         }
-
+        if (processo_criado[i] == 0){
+            arg2[i]=i;
+            arg[i] = &arg2[i];
+            if (pthread_create(&tid[i], NULL, ThreadAdd, arg[i])) {
+                printf("\n ERROR creating thread");
+                exit(1);
+            }
+            if (d) 
+                fprintf(stderr, "Chegou um processo no sistema: %s %d %d %d\n\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
+            processo_criado[i] = 1;
+        }
 
         tempo_inicio = ((double)clock() - start) / CLOCKS_PER_SEC;
         pthread_mutex_unlock(&mutex[i]);
         context_chg++;
         if (d) fprintf(stderr, "O processo '%s' comecou a usar a CPU.\n", nome_list[i]);
         
-        usleep(quantum*1000000);
+        if (programas_finalizados == count-1){
+            usleep((dt_list[i] - tempo_rodado[i])*1000000);
+            if (d) fprintf(stderr, "O processo '%s' deixou de usar a CPU.\n\n", nome_list[i]);
+            killthread[i] = 1;
+            pthread_mutex_unlock(&mutex[i]);
+            if (pthread_join(tid[i], NULL))  {
+                printf("\n ERROR joining thread");
+                exit(1);
+            }   
+            sprintf(linha_saida_file, "%s %lf %lf\n", nome_list[i], (((double)clock() - start) / CLOCKS_PER_SEC), tempo_rodado[i] );
+            fputs(linha_saida_file, saida_file);
+            if (d) fprintf(stderr, "Processo finalizado: %s\n", linha_saida_file);
+            break;
+        }else
+            usleep(quantum*1000000);
 
         pthread_mutex_lock(&mutex[i]);
 
