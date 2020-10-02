@@ -10,65 +10,71 @@
 
 pthread_mutex_t *mutex;
 
-short int *commthread;
+short int *killthread;
 // Vetor para comunicacao entre a main thread e as thread filhas;
 // apenas a main thread a modifica.
 // Funciona assim, para a branch numero n, o vetor commthread[n] tem os numero possiveis
-// 0 -> Branch deve pausar sua execucao
-// 1 -> Branch deve rodar
-// 2 -> Branch deve se finalizar
+// 0 -> Branch deve continuar sua execucao
+// 1 -> Branch deve se finalizar
 
-void * ThreadAdd(void * m_args){
+void * ThreadAdd(void * arg){ 
     void *ret;
-    // thread_number *args = m_args;
-    int n = *((int *)m_args);
+    int i, n = *((int *)arg);
+    // printf("Entrou no processo %d\n",n);
     int count = -20000;
-    return 0;
-    switch (commthread[n]){
-    case 1:
-        if(count<20000)
-            count++;
-        else
-            count = -20000;
-        break;
-    case 2:
-        return ret;
-    default:
-        break;
+    while(1){
+        switch (killthread[n]){
+        case 0:
+            pthread_mutex_lock(&mutex[n]);
+            pthread_mutex_unlock(&mutex[n]);
+            for(i=0;i<2;i++){
+                if(count<20000)
+                    count++;
+                else
+                    count = -20000;
+            }
+            break;
+        case 1:  
+            return ret;
+            break;
+        }
     }
 }
 
 void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE* saida_file, short int d){
-    printf("-----------First-Come First-Served Scheduling-----------\n");
-    commthread = malloc(count * sizeof(short int));
+    killthread = malloc(count * sizeof(short int));
+    mutex = malloc(count * sizeof(pthread_mutex_t));
     clock_t start;
     pthread_t tid[count];
     start = clock();
 
     double tempo_inicio, tempo_corrido, tempo_final, auxd;
-    int *arg, context_chg = 0;
+    int **arg, context_chg = 0;
 
     char linha_saida_file[50] = {0};
     
+    arg = malloc((2*count) * sizeof(int));
+
     start = clock();
     for(int i = 0; i < count; i++){
         context_chg++;
-        arg = malloc(sizeof(int));
-        arg = &i;
+        arg[i] = &i;
 
-        commthread[i] = 1;
+        killthread[i] = 0;
+        pthread_mutex_unlock(&mutex[i]);
 
         tempo_inicio = (double)(clock() - start) / CLOCKS_PER_SEC;
         while (tempo_inicio < t0_list[i])
             tempo_inicio = (double)(clock() - start) / CLOCKS_PER_SEC;
         
-        // printf("Chamou thread n:%d, no tempo: %f\n",i,tempo_corrido);
-        if (pthread_create(&tid[i], NULL, ThreadAdd, arg)) {
+        if (pthread_create(&tid[i], NULL, ThreadAdd, arg[i])) {
             printf("\n ERROR creating thread");
             exit(1);
         }
-        if(d)
+        if(d){
             fprintf(stderr, "Chegou um processo no sistema: %s %d %d %d\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
+            fprintf(stderr, "O processo '%s' comecou a usar a CPU.\n", nome_list[i]);
+        }        
         
         auxd = (double)clock() / CLOCKS_PER_SEC;
         tempo_corrido = auxd - tempo_inicio;
@@ -76,7 +82,7 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
             auxd = (double)clock() / CLOCKS_PER_SEC;
             tempo_corrido = auxd - tempo_inicio;
         }
-        commthread[i] = 2;
+        killthread[i] = 1;
 
         if (pthread_join(tid[i], NULL))  {
             printf("\n ERROR joining thread");
@@ -84,8 +90,10 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
         }
         tempo_final = ((double)(clock() - start)) / CLOCKS_PER_SEC;
         sprintf(linha_saida_file, "%s %lf %lf\n", nome_list[i], tempo_final, tempo_corrido );
-        if(d)
+        if(d){
             fprintf(stderr, "Processo finalizado: %s\n", linha_saida_file);
+            fprintf(stderr, "O processo '%s' deixou de usar a CPU.\n", nome_list[i]);
+        }
         fputs(linha_saida_file, saida_file);
         // free(args);
     }
@@ -123,7 +131,8 @@ char ** parseNome(FILE *trace_file, int count){
             j++;
         }
         nome[i][j] = '\0';
-        while(fgount_mutex
+        while(fgetc(trace_file) != '\n');
+        i++;
     }
     return nome;
 
@@ -203,32 +212,53 @@ int main(int argc, char *argv[]){
             printf("%s\n",nome_proc_list[i]);
         printf("----------------------------\n");
     }
-    // if(atoi(argv[1]) == 1)
-    //     FIFO(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
-    // else if(atoi(argv[1]) == 2)
-    //     SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
-    // else
-    //     RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
-
-    mutex = malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(&mutex[0], NULL);
-
-    int *arg;
-    commthread = malloc(2 * sizeof(short int));
-    pthread_t tid[2];
-    for(i=0;i<2;i++){
-        arg = malloc(sizeof(int));
-        arg = &i;
-        if (pthread_create(&tid[0], NULL, ThreadAdd, arg)) {
-            printf("\n ERROR creating thread");
-            exit(1);
-        }
-        if (pthread_create(&tid[1], NULL, ThreadAdd, arg)) {
-            printf("\n ERROR creating thread");
-            exit(1);
-        }
-    }   
+    if(atoi(argv[1]) == 1)
+        FIFO(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
+    else if(atoi(argv[1]) == 2)
+        SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
+    else
+        RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
     
+    
+    // int *arg, *arglist;
+    // mutex = malloc(2 * sizeof(pthread_mutex_t));
+    // arglist = malloc(2 * sizeof(int));
+    // killthread = malloc(2 * sizeof(short int));
+    // pthread_t tid[2];
+    // for(i=0;i<2;i++){
+    //     killthread[i] = 0;
+    //     pthread_mutex_lock(&mutex[i]);
+    // }
+    // arg = malloc(sizeof(int));
+    // for(i=0;i<2;i++){
+    //     arglist[i] = i;
+    //     arg = &arglist[i];
+    //     if (pthread_create(&tid[i], NULL, ThreadAdd, arg)) {
+    //         printf("\n ERROR creating thread");
+    //         exit(1);
+    //     }
+    // }  
+
+    // sleep(1);
+    // pthread_mutex_unlock(&mutex[0]);
+    // sleep(1);
+    // pthread_mutex_lock(&mutex[0]);
+    // sleep(1);
+    // killthread[0] = 1;
+    // pthread_mutex_unlock(&mutex[0]);
+    // pthread_mutex_lock(&mutex[0]);
+    // pthread_mutex_lock(&mutex[0]);
+    // sleep(1);
+    // pthread_mutex_unlock(&mutex[1]);
+    // sleep(1);
+    // pthread_mutex_lock(&mutex[1]);
+    // sleep(1);
+    // pthread_mutex_unlock(&mutex[0]);
+    // sleep(1);
+    // pthread_mutex_lock(&mutex[0]);
+    // killthread[0] = 1;
+    // killthread[1] = 1;
+    // pthread_join(tid[0], NULL);
 
     return 0;
 }
