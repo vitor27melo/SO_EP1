@@ -18,7 +18,6 @@ short int *killthread;
 // 1 -> Branch deve se finalizar
 
 void * ThreadAdd(void * arg){ 
-    void *ret;
     int i, n = *((int *)arg);
     int count = -20000;
     while(1){
@@ -34,7 +33,7 @@ void * ThreadAdd(void * arg){
             }
             break;
         case 1:  
-            return ret;
+            return arg;
             break;
         }
     }
@@ -48,17 +47,18 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
     start = clock();
 
     double tempo_inicio, tempo_corrido, tempo_final, auxd;
-    int **arg, context_chg = 0;
+    int **arg, *arg2, context_chg = 0;
 
     char linha_saida_file[50] = {0};
     
     arg = malloc((2*count) * sizeof(int));
+    arg2 = malloc((2*count) * sizeof(int));
 
     start = clock();
     for(int i = 0; i < count; i++){
         context_chg++;
-        arg[i] = &i;
-
+        arg2[i] = i;
+        arg[i] = &arg2[i];
         killthread[i] = 0;
         pthread_mutex_unlock(&mutex[i]);
 
@@ -75,13 +75,6 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
             fprintf(stderr, "O processo '%s' comecou a usar a CPU.\n", nome_list[i]);
         }        
         
-        // "Sleep"
-        // Aqui, nós multiplicamos o dt_list[n] por 2, pois como serão duas threads rodando,
-        // o número de clocks que o processo utiliza será aproximadamente o dobro.
-        // while (tempo_corrido < dt_list[i]*2){
-        //     auxd = (double)clock() / CLOCKS_PER_SEC;
-        //     tempo_corrido = auxd - tempo_inicio;
-        // }
         usleep(dt_list[i]*1000000);
         
         auxd = (double)clock() / CLOCKS_PER_SEC;
@@ -95,8 +88,8 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
         tempo_final = ((double)(clock() - start)) / CLOCKS_PER_SEC;
         sprintf(linha_saida_file, "%s %lf %lf\n", nome_list[i], tempo_final, tempo_corrido);
         if(d){
-            fprintf(stderr, "Processo finalizado: %s", linha_saida_file);
-            fprintf(stderr, "O processo '%s' deixou de usar a CPU.\n\n", nome_list[i]);
+            fprintf(stderr, "O processo '%s' deixou de usar a CPU.\n", nome_list[i]);
+            fprintf(stderr, "\nProcesso finalizado: %s\n", linha_saida_file);
         }
         fputs(linha_saida_file, saida_file);
         // free(args);
@@ -109,10 +102,61 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
 
 void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file, short int d){
     printf("-----------Shortest Remaining Time Next Scheduling-----------\n");
+    killthread = malloc(count * sizeof(short int));
+    mutex = malloc(count * sizeof(pthread_mutex_t));
+    clock_t start;
+    pthread_t tid[count];
+
+    double tempo_inicio, tempo_corrido, tempo_total, auxd;
+    double *remaining_time = malloc(count * sizeof(double));
+    double *tempo_rodado = malloc(count * sizeof(double));
+    int i, j, aux, srt, **arg, *arg2, programas_finalizados = 0, context_chg = 0;
+    int *processo_criado = malloc(count * sizeof(int));
+    
+    for(i=0;i<count;i++){
+        processo_criado[i] = 0;
+        remaining_time[i] = dt_list[i];
+        pthread_mutex_lock(&mutex[i]);
+    }
+
+    arg = malloc((2*count) * sizeof(int));
+    arg2 = malloc((2*count) * sizeof(int));
+
+
+    start = clock();
+    while (programas_finalizados < count){
+        aux = 0;
+        for(j=0;j<count;j++) if(remaining_time[j]>aux) {aux=remaining_time[j]; i=j;}
+
+        if(processo_criado[i] == 0){
+            arg2[i]=i;
+            arg[i] = &arg2[i];
+            if (pthread_create(&tid[i], NULL, ThreadAdd, arg[i])) {
+                printf("\n ERROR creating thread");
+                exit(1);
+            }
+            processo_criado[i] = 1;
+        }
+
+        tempo_inicio = (double)(clock() - start) / CLOCKS_PER_SEC;
+        pthread_mutex_unlock(&mutex[i]);
+        context_chg++;
+
+        
+        tempo_total = ((double)clock() - start) / CLOCKS_PER_SEC;
+        while ((tempo_total - tempo_inicio) < remaining_time[i]){
+            
+            
+
+            auxd = (double)clock() / CLOCKS_PER_SEC;
+            tempo_corrido = auxd - tempo_inicio;
+        }
+
+    }
+
 }
 
 void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file, short int d){
-    printf("-----------Round Robin Scheduling-----------\n");
     killthread = malloc(count * sizeof(short int));
     mutex = malloc(count * sizeof(pthread_mutex_t));
     clock_t start;
@@ -120,17 +164,18 @@ void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int co
 
     double tempo_inicio, tempo_corrido, tempo_final, auxd;
     double *tempo_rodado = malloc(count * sizeof(double));
-    int i, **arg, *arg2, programas_finalizados = 0, context_chg = 0;
-
+    int i, *processo_criado,**arg, *arg2, programas_finalizados = 0, context_chg = 0;
+    processo_criado = malloc(count * sizeof(int));
     for (i=0;i<count;i++) tempo_rodado[i]=0;
     char linha_saida_file[50] = {0};
     
     arg = malloc((2*count) * sizeof(int));
     arg2 = malloc((2*count) * sizeof(int));
     for(i = 0; i < count; i++){
+        processo_criado[i] = 0;
         pthread_mutex_lock(&mutex[i]);
-        arg2[i]=i;
         killthread[i] = 0;
+        arg2[i]=i;
         arg[i] = &arg2[i];
         if (pthread_create(&tid[i], NULL, ThreadAdd, arg[i])) {
             printf("\n ERROR creating thread");
@@ -142,7 +187,7 @@ void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int co
     int *finalizado = malloc(count * sizeof(int));
     for (i=0;i<count;i++) finalizado[i]=0;
     // Quantum
-    double quantum = 0.5;
+    double quantum = 0.1;
     i = 0;
     start = clock();
     while(programas_finalizados < count){
@@ -158,16 +203,10 @@ void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int co
 
 
         tempo_inicio = ((double)clock() - start) / CLOCKS_PER_SEC;
-        context_chg++;
         pthread_mutex_unlock(&mutex[i]);
+        context_chg++;
         if (d) fprintf(stderr, "O processo '%s' comecou a usar a CPU.\n", nome_list[i]);
-        // auxd = (double)clock() / CLOCKS_PER_SEC;
-        // tempo_corrido = auxd - tempo_inicio;
-        // while (tempo_corrido < quantum*2){
-        //     auxd = (double)clock() / CLOCKS_PER_SEC;
-        //     tempo_corrido = auxd - tempo_inicio;
-        // }
-        // tempo_corrido = tempo_corrido/2;
+        
         usleep(quantum*1000000);
 
         pthread_mutex_lock(&mutex[i]);
@@ -186,6 +225,7 @@ void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int co
             }   
 
             sprintf(linha_saida_file, "%s %lf %lf\n", nome_list[i], (((double)clock() - start) / CLOCKS_PER_SEC), tempo_rodado[i] );
+            fputs(linha_saida_file, saida_file);
             if (d) fprintf(stderr, "Processo finalizado: %s\n", linha_saida_file);
             programas_finalizados++;
             finalizado[i] = 1;
@@ -306,23 +346,6 @@ int main(int argc, char *argv[]){
         SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
     else
         RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
-
-    // double auxd, tempo_corrido, tempo_inicio;
-    // clock_t start;
-
-    // start = clock();
-
-    // tempo_inicio = ((double)clock() - start) / CLOCKS_PER_SEC;
-
-    // auxd = (double)clock() / CLOCKS_PER_SEC;
-    // tempo_corrido = auxd - tempo_inicio;
-    // while (tempo_corrido < 5){
-    //     // printf("-");
-    //     auxd = (double)clock() / CLOCKS_PER_SEC;
-    //     tempo_corrido = auxd - tempo_inicio;
-    // }
-
-    // printf("tempo inicio: %lf\ntempo_corrido: %lf",tempo_inicio,tempo_corrido);
 
     return 0;
 }
