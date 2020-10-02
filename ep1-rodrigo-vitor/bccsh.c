@@ -43,7 +43,7 @@ int leEntrada(char *entrada){
 
 void parseEntrada(char *entrada, char **entrada_parseada){
     int i;
-    for (i=0; i<=3 ; i++){
+    for (i=0; i<=4 ; i++){
         entrada_parseada[i] = strsep(&entrada, " ");
         if (entrada_parseada[i] == NULL)
             break;
@@ -81,7 +81,7 @@ int executaEntrada(char **entrada_parseada){
 int main(){
     // Recupera o nome do usuário
     char *user = getenv("USER");
-    char cwd[1024], entrada[1024], *entrada_parseada[4];
+    char cwd[1024], entrada[1024], *entrada_parseada[5];
     while (1){
         // Recupera o diretório atual
         getcwd(cwd, sizeof(cwd));
