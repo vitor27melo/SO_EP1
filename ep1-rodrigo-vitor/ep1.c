@@ -101,7 +101,6 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
         fprintf(stderr, "No total, aconteceram %d mudancas de contexto.\n", context_chg);
     sprintf(linha_saida_file, "%d", context_chg);
     fputs(linha_saida_file, saida_file);
-    // free(commthread);
 }
 
 void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file, short int d){
@@ -110,6 +109,79 @@ void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
 
 void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int count, FILE *saida_file, short int d){
     printf("-----------Round Robin Scheduling-----------\n");
+    killthread = malloc(count * sizeof(short int));
+    mutex = malloc(count * sizeof(pthread_mutex_t));
+    clock_t start;
+    pthread_t tid[count];
+
+    double tempo_inicio, tempo_corrido, tempo_final, auxd;
+    double *tempo_rodado = malloc(count * sizeof(double));
+    int i, **arg, programas_finalizados = 0, context_chg = 0;
+
+    for (i=0;i<count;i++) tempo_rodado[i]=0;
+    char linha_saida_file[50] = {0};
+    
+    arg = malloc((2*count) * sizeof(int));
+    for(i = 0; i < count; i++){
+        pthread_mutex_lock(&mutex[i]);
+        killthread[i] = 0;
+        arg[i] = &i;
+        if (pthread_create(&tid[i], NULL, ThreadAdd, arg[i])) {
+            printf("\n ERROR creating thread");
+            exit(1);
+        }
+        if (d) fprintf(stderr, "Chegou um processo no sistema: %s %d %d %d\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
+    }
+    int *finalizado = malloc(count * sizeof(int));
+    for (i=0;i<count;i++) finalizado[i]=0;
+    // Quantum: 1 centésimo de segundo
+    int quantum = 0.01;
+    i = 0;
+    start = clock();
+    while(programas_finalizados < count){
+        if (i == count) i = 0;
+        if (finalizado[i] == 1){
+            i++;
+            continue;
+        }
+        if ((((double)clock() - start) / CLOCKS_PER_SEC) < t0_list[i]){
+            i++;
+            continue;
+        }
+
+
+        tempo_inicio = ((double)clock() - start) / CLOCKS_PER_SEC;
+
+        pthread_mutex_unlock(&mutex[i]);
+        if (d) fprintf(stderr, "O processo '%s' comecou a usar a CPU.\n", nome_list[i]);
+        auxd = (double)clock() / CLOCKS_PER_SEC;
+        tempo_corrido = auxd - tempo_inicio;
+        while (tempo_corrido < quantum){
+            auxd = (double)clock() / CLOCKS_PER_SEC;
+            tempo_corrido = auxd - tempo_inicio;
+        }
+        pthread_mutex_lock(&mutex[i]);
+        if (d) fprintf(stderr, "O processo '%s' deixou de usar a CPU.\n", nome_list[i]);
+        tempo_rodado[i] += tempo_corrido;
+        
+        if(tempo_rodado[i] >= dt_list[i]){
+            killthread[i] = 1;
+            pthread_mutex_unlock(&mutex[i]);
+            if (pthread_join(tid[i], NULL))  {
+                printf("\n ERROR joining thread");
+                exit(1);
+            }   
+
+            sprintf(linha_saida_file, "%s %lf %lf\n", nome_list[i], (((double)clock() - start) / CLOCKS_PER_SEC), tempo_rodado[i] );
+            if (d) fprintf(stderr, "Processo finalizado: %s\n", linha_saida_file);
+            programas_finalizados++;
+            finalizado[i] = 1;
+            printf("\n\n\n%d\n\n\n",programas_finalizados);
+        }
+
+        i++;
+    }
+    printf("\nScheduler finalizado\n");
 }
 
 
@@ -218,47 +290,6 @@ int main(int argc, char *argv[]){
         SRTN(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
     else
         RR(t0_proc_list, dt_proc_list, deadline_proc_list, nome_proc_list, count, saida_file, d);
-    
-    
-    // int *arg, *arglist;
-    // mutex = malloc(2 * sizeof(pthread_mutex_t));
-    // arglist = malloc(2 * sizeof(int));
-    // killthread = malloc(2 * sizeof(short int));
-    // pthread_t tid[2];
-    // for(i=0;i<2;i++){
-    //     killthread[i] = 0;
-    //     pthread_mutex_lock(&mutex[i]);
-    // }
-    // arg = malloc(sizeof(int));
-    // for(i=0;i<2;i++){
-    //     arglist[i] = i;
-    //     arg = &arglist[i];
-    //     if (pthread_create(&tid[i], NULL, ThreadAdd, arg)) {
-    //         printf("\n ERROR creating thread");
-    //         exit(1);
-    //     }
-    // }  
-
-    // sleep(1);
-    // pthread_mutex_unlock(&mutex[0]);
-    // sleep(1);
-    // pthread_mutex_lock(&mutex[0]);
-    // sleep(1);
-    // killthread[0] = 1;
-    // pthread_mutex_unlock(&mutex[0]);
-    // pthread_mutex_lock(&mutex[0]);
-    // pthread_mutex_lock(&mutex[0]);
-    // sleep(1);
-    // pthread_mutex_unlock(&mutex[1]);
-    // sleep(1);
-    // pthread_mutex_lock(&mutex[1]);
-    // sleep(1);
-    // pthread_mutex_unlock(&mutex[0]);
-    // sleep(1);
-    // pthread_mutex_lock(&mutex[0]);
-    // killthread[0] = 1;
-    // killthread[1] = 1;
-    // pthread_join(tid[0], NULL);
 
     return 0;
 }
