@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <time.h>
 
-#define QUANTUM 0.1
+#define QUANTUM 0.5
 
 pthread_mutex_t *mutex;
 
@@ -73,7 +73,7 @@ void FIFO(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
         // Realoca o valor do tempo_inicio, para melhor representar quanto tempo real a thread utilizou
         tempo_inicio = (double)(clock() - start) / CLOCKS_PER_SEC;
         if (d){
-            fprintf(stderr, "Chegou um processo no sistema: %s %d %d %d\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
+            fprintf(stderr, "Chegou um processo no sistema: %s %d %d %d\n\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
             fprintf(stderr, "O processo '%s' comecou a usar a CPU.\n", nome_list[i]);
         }
 
@@ -155,7 +155,7 @@ void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
         }
 
         // Espera o tempo de início do próximo processo, caso ele ainda não tenho passado
-        if ((((double)clock() - start) / CLOCKS_PER_SEC) < t0_list[i]){
+        if ((((double)clock() - start) / CLOCKS_PER_SEC)/2 < t0_list[i]){
             i++;
             continue;
         }
@@ -169,7 +169,7 @@ void SRTN(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int 
             }
             processos_criados++;
             if (d) 
-                fprintf(stderr, "\nChegou um processo no sistema: %s %d %d %d\n\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i]);
+                fprintf(stderr, "\nChegou um processo no sistema: %s %d %d %d no tempo %lf\n\n", nome_list[i], t0_list[i], dt_list[i], deadline_list[i],(((double)clock() - start) / CLOCKS_PER_SEC)/2);
             processo_criado[i] = 1;
         }
         
@@ -317,9 +317,9 @@ void RR(int *t0_list, int *dt_list, int *deadline_list, char **nome_list, int co
         
         // Verifica se o processo a ser executado é o último na fila de processos,
         // nesse caso, ele roda de forma ininterrupta até terminar
-        if (programas_finalizados == count - 1)
+        if (programas_finalizados == count - 1){
             usleep((dt_list[i] - tempo_rodado[i])*1000000);
-        else
+        }else
             usleep(QUANTUM*1000000);
 
         // Pausa o processo que estava em execução

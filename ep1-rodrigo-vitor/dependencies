@@ -1,0 +1,4 @@
+Python 3.*
+Plotly - pip3 install plotly
+Pandas - pip3 install pandas
+kaleido - pip3 install kaleido

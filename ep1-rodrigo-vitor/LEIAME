@@ -1,1 +1,10 @@
-Execute o comando make no diretório deste arquivo.
+Para gerar os binários bccsh e ep1, execute o comando make no diretório deste arquivo.
+
+Anotacoes para a apresentacao:
+
+- Para o SRTN, utilizamos um código de espera ativa, em que main Thread monitora continuamente o tempo de processamento
+do programa verificando se deu o tempo de um processo novo comecar
+
+- Nos nossos testes, nao conseguimos construir um arquivo de trace em que o round robin fosse o processamento mais
+efetivo entre os três em cumprimento de deadlines.
+
