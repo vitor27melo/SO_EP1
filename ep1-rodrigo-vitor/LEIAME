@@ -1,4 +1,14 @@
-Para gerar os binários bccsh e ep1, execute o comando make no diretório deste arquivo.
+Autores:
+    Rodrigo Vidotti de Sousa, nUSP: 
+    Vitor Carvalho de Melo, nUSP: 10723753
+
+Instrucões:
+    - Para gerar os binários bccsh e ep1, execute o comando make no diretório deste arquivo.
+    - Para executar o shell, certifique-se que o binário gerado pelo Makefile (bccsh), possui permissão para executar
+    e execute ./bccsh no terminal
+    - Para executar o simulador de escalonador de processos, execute o shell (bccsh), e dentro dele, execute 
+    ./ep1 <n_escalonador> <arquivo_de_entrada> <arquivo_saida> <d>
+
 
 Anotacoes para a apresentacao:
 

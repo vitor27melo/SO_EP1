@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <time.h>
 
-#define QUANTUM 0.5
+#define QUANTUM 0.1
 
 pthread_mutex_t *mutex;
 
